@@ -1,4 +1,5 @@
-import { Request, Response } from "express";
+import express from "express";
+import type { Request, Response } from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
@@ -21,12 +22,11 @@ const userSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-// ========================== SIGNUP ROUTE ==========================
+// Routes
 app.post("/api/v1/signup", async (req: Request, res: Response) => {
   try {
     // Validate request body using Zod
-    const parsed = userSchema.parse(req.body);
-    const { username, password } = parsed;
+    const { username, password } = userSchema.parse(req.body);
 
     // Check if the user already exists
     const existingUser = await UserModel.findOne({ username });
@@ -46,12 +46,10 @@ app.post("/api/v1/signup", async (req: Request, res: Response) => {
   }
 });
 
-// ========================== SIGNIN ROUTE ==========================
 app.post("/api/v1/signin", async (req: Request, res: Response) => {
   try {
     // Validate request body using Zod
-    const parsed = userSchema.parse(req.body);
-    const { username, password } = parsed;
+    const { username, password } = userSchema.parse(req.body);
 
     // Find the user in the database
     const user = await UserModel.findOne({ username });
@@ -80,8 +78,6 @@ app.post("/api/v1/signin", async (req: Request, res: Response) => {
 });
 
 // ========================== SAMPLE ROUTES ==========================
-
-// Simple GET route (protected routes would need JWT verification)
 app.get("/api/v1/content", (req: Request, res: Response) => {
   res.send("Hello World");
 });

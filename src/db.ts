@@ -16,6 +16,7 @@ mongoose.connect(process.env.MONGO_URI as string || "mongodb://localhost:27017/"
 export interface IUser extends Document {
     username: string;
     password: string;
+
 }
 
 const UserSchema = new Schema({
@@ -23,6 +24,14 @@ const UserSchema = new Schema({
     password: { type: String }
 });
 
-const UserModel = model<IUser>('User', UserSchema);
+const contentSchema = new Schema({
+    title: { type: String },
+    links: { type: String },
+    tags:[{type:mongoose.Schema.Types.ObjectId,ref:"Tag"}],
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+});
 
-export default UserModel;
+const UserModel = model('User', UserSchema);
+const ContentModel = model('Content', contentSchema);
+
+export default {UserModel,ContentModel};
