@@ -1,50 +1,105 @@
-import express from "express";
+import { Request, Response } from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
-//import cors from "cors";
-dotenv.config();
+import { z } from "zod";
+import UserModel from "./db";
+import bcrypt from "bcrypt";
+
+dotenv.config(); // Load environment variables
 
 const app = express();
 
+// Middleware to parse incoming JSON and URL-encoded data
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-
-//Routes
-//app.use("/api/auth", authRoutes);
-app.post("/api/v1/signup", (req, res) => {
-    res.send("Hello World");
-}); 
-
-app.post("/api/v1/signin", (req, res) => {
-    res.send("Hello World");
+// ✅ Zod schema for validating incoming user data (username & password)
+const userSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
-app.get("/api/v1/content", (req, res) => {
-    res.send("Hello World");
-}); 
+// ========================== SIGNUP ROUTE ==========================
+app.post("/api/v1/signup", async (req: Request, res: Response) => {
+  try {
+    // Validate request body using Zod
+    const parsed = userSchema.parse(req.body);
+    const { username, password } = parsed;
 
+    // Check if the user already exists
+    const existingUser = await UserModel.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
-app.delete("/api/v1/content", (req, res) => {
-    res.send("Hello World");
-}); 
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new UserModel({ username, password: hashedPassword });
+    await newUser.save();
 
-app.post("/api/v1/brain/share", (req, res) => {
-    res.send("Hello World");
-}); 
+    // Respond with success message
+    res.status(201).json({ message: "User created successfully" });
+  } catch (error) {
+    res.status(400).json({ message: "Invalid input or internal error" });
+  }
+});
 
-app.get("/api/v1/brain/:shareLink", (req, res) => {
-    res.send("Hello World");
-});  
+// ========================== SIGNIN ROUTE ==========================
+app.post("/api/v1/signin", async (req: Request, res: Response) => {
+  try {
+    // Validate request body using Zod
+    const parsed = userSchema.parse(req.body);
+    const { username, password } = parsed;
 
+    // Find the user in the database
+    const user = await UserModel.findOne({ username });
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
 
+    // Compare provided password with stored hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
 
+    // ✅ Generate JWT token after successful login
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" } // token expires in 1 hour
+    );
 
+    // Return token to client
+    res.status(200).json({ token });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
+// ========================== SAMPLE ROUTES ==========================
 
+// Simple GET route (protected routes would need JWT verification)
+app.get("/api/v1/content", (req: Request, res: Response) => {
+  res.send("Hello World");
+});
 
+app.delete("/api/v1/content", (req: Request, res: Response) => {
+  res.send("Hello World");
+});
 
+app.post("/api/v1/brain/share", (req: Request, res: Response) => {
+  res.send("Hello World");
+});
 
+app.get("/api/v1/brain/:shareLink", (req: Request, res: Response) => {
+  res.send("Hello World");
+});
 
-
-
+// ========================== START SERVER ==========================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+});

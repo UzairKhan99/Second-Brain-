@@ -1,17 +1,28 @@
-//MongoDB connection
+//Schema 
 import mongoose from "mongoose";
-mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/"  );
-mongoose.connection.on("error", (err) => {
-    console.log("MongoDB connection error: " + err);
+import { model, Schema, Document } from "mongoose";
+///connection 
+mongoose.connect(process.env.MONGO_URI as string || "mongodb://localhost:27017/")
+.then(()=>{
+    console.log("Connected to MongoDB");
+})
+.catch((err)=>{
+    console.log(err);
+})  
+
+
+
+// Interface for User document
+export interface IUser extends Document {
+    username: string;
+    password: string;
+}
+
+const UserSchema = new Schema({
+    username: { type: String, unique: true },
+    password: { type: String }
 });
-mongoose.connection.on("connected", () => {
-    console.log("MongoDB connected");
-}); 
-export default mongoose;
 
+const UserModel = model<IUser>('User', UserSchema);
 
-
-
-
-
-
+export default UserModel;
