@@ -1,13 +1,16 @@
 import express from "express";
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bodyParser from "body-parser";
 import { z } from "zod";
-import UserModel from "./db";
+import {UserModel, ContentModel} from "./db";
 import bcrypt from "bcrypt";
+import { authMiddleware } from "./middleware";
 
+
+// ✅ Load environment variables
 dotenv.config(); // Load environment variables
 
 const app = express();
@@ -51,50 +54,83 @@ app.post("/api/v1/signup", async (req: Request, res: Response) => {
 //@ts-ignore
 app.post("/api/v1/signin", async (req: Request, res: Response) => {
   try {
-    // Validate request body using Zod
+    // Validate the request body using Zod schema
     const { username, password } = userSchema.parse(req.body);
-
-    // Find the user in the database
-    //@ts-ignore
+    
+    // Find user by username
     const user = await UserModel.findOne({ username });
     if (!user) {
       return res.status(400).json({ message: "User not found" });
     }
-
-    // Compare provided password with stored hashed password
+    
+    // Verify password
+    //@ts-ignore
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(400).json({ message: "Invalid password" });
     }
-
-    // ✅ Generate JWT token after successful login
+    
+    // Generate JWT token with 1 hour expiry
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET as string,
-      { expiresIn: "1h" } // token expires in 1 hour
+      { expiresIn: "1h" }
     );
-
-    // Return token to client
     res.status(200).json({ token });
   } catch (error) {
+    // Handle validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Invalid input data", errors: error.errors });
+    }
+    
+    // Handle missing JWT secret
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: "JWT_SECRET not configured" });
+    }
+    
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
 // ========================== SAMPLE ROUTES ==========================
-app.get("/api/v1/content", (req: Request, res: Response) => {
+//@ts-ignore
+app.post("/api/v1/content", authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { title, links } = req.body;
+    const userId = (req as any).userId;
+    const content = await ContentModel.create({ title, links, tags: [], userId });
+    res.status(200).json({ content });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+//@ts-ignore
+app.get("/api/v1/content", authMiddleware, async (req: Request, res: Response) => {
+  const userID=(req as any).userId;
+  const content=await ContentModel.find({userId:userID}).populate("userId","username");
+  res.status(200).json({content});
+});
+
+//@ts-ignore
+app.delete("/api/v1/content", authMiddleware, async (req: Request, res: Response) => {
+   const contentID=req.body.contentID;
+   const userID=(req as any).userId;
+   const content=await ContentModel.findOne({_id:contentID,userId:userID});
+   if(!content){
+    return res.status(404).json({message:"Content not found"});
+   }
+   await ContentModel.deleteOne({_id:contentID});
+   res.status(200).json({message:"Content deleted successfully"});
+});
+
+//@ts-ignore
+app.post("/api/v1/brain/share", authMiddleware, (req: Request, res: Response) => {
   res.send("Hello World");
 });
 
-app.delete("/api/v1/content", (req: Request, res: Response) => {
-  res.send("Hello World");
-});
-
-app.post("/api/v1/brain/share", (req: Request, res: Response) => {
-  res.send("Hello World");
-});
-
-app.get("/api/v1/brain/:shareLink", (req: Request, res: Response) => {
+//@ts-ignore
+app.get("/api/v1/brain/:shareLink", authMiddleware, (req: Request, res: Response) => {
   res.send("Hello World");
 });
 

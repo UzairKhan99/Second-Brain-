@@ -34,4 +34,4 @@ const contentSchema = new Schema({
 const UserModel = model('User', UserSchema);
 const ContentModel = model('Content', contentSchema);
 
-export default {UserModel,ContentModel};
+export {UserModel,ContentModel};
